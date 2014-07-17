@@ -6,10 +6,7 @@ HMAC Auth for your Go web applications
 Quickstart
 ----------
 
-Go HMACAuth is designed with the Martini web framework in mind, but it
-will work perfectly well with a standard `net/http` web application as
-well. With that in mind, we'll be using Martini in the examples that
-follow.
+Go HMACAuth is designed with the Negroni web library in mind. It is a fork of https://github.com/apiguy/go-hmacauth middleware that was designed to work with the Martini framework.
 
 ### Simple Server Example:
 
@@ -18,12 +15,17 @@ follow.
 package main
 
 import (
-	"github.com/apiguy/go-hmacauth"
-	"github.com/codegangsta/martini"
+	"net/http"
+	"fmt"
+	"github.com/schuz0r/go-hmacauth"
+	"github.com/codegangsta/negroni"
 )
 
 func main() {
-	m := martini.Classic()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		fmt.Fprintf(w, "Hello World")
+	})
 
 	options := hmacauth.Options{
 		SignedHeaders:       []string{"Content-MD5", "Content-Type"},
@@ -31,13 +33,10 @@ func main() {
 		SignatureExpiresIn: 300 * time.Second,
 	}
 
-	m.Use(hmacauth.HMACAuth(options))
-
-	m.Get("/", func() string {
-		return "Hello World"
-	})
-
-	m.Run()
+	n := negroni.Classic()
+	n.Use(hmacauth.New(options))
+	n.UseHandler(mux)
+	n.Run(":3000")
 }
 
 ```
