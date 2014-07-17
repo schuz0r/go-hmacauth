@@ -5,11 +5,11 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"log"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
-	"log"
 )
 
 const (
@@ -62,38 +62,47 @@ func (ab *authBits) SetTimestamp(isoTime string) (err error) {
 	return
 }
 
-func HMACAuth(options Options) middleware {
+type HMACAuth struct {
+	options Options
+}
+
+func (ha HMACAuth) ServeHTTP(res http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
 	// Validate options
-	if options.SecretKey == nil {
+	if ha.options.SecretKey == nil {
 		panic(secretKeyRequired)
 	}
 
-	return func(res http.ResponseWriter, req *http.Request) {
-		var (
-			err error
-			ab  *authBits
-		)
+	var (
+		err error
+		ab  *authBits
+	)
 
-		if ab, err = parseAuthHeader(req.Header.Get(authorizationHeader)); err == nil {
-			if err = validateTimestamp(ab.Timestamp, &options); err == nil {
-				var sts string
-				if sts, err = stringToSign(req, &options, ab.TimestampString); err == nil {
-					if sk := options.SecretKey(ab.APIKey); sk != empty {
-						if ab.Signature != signString(sts, sk) {
-							err = HMACAuthError{invalidSignature}
-						}
-					} else {
-						err = HMACAuthError{invalidAPIKey}
+	if ab, err = parseAuthHeader(req.Header.Get(authorizationHeader)); err == nil {
+		if err = validateTimestamp(ab.Timestamp, &ha.options); err == nil {
+			var sts string
+			if sts, err = stringToSign(req, &ha.options, ab.TimestampString); err == nil {
+				if sk := ha.options.SecretKey(ab.APIKey); sk != empty {
+					if ab.Signature != signString(sts, sk) {
+						err = HMACAuthError{invalidSignature}
 					}
+				} else {
+					err = HMACAuthError{invalidAPIKey}
 				}
 			}
 		}
-
-		if err != nil {
-			log.Println(err.Error())
-			http.Error(res, err.Error(), 401)
-		}
 	}
+
+	if err != nil {
+		log.Println(err.Error())
+		http.Error(res, err.Error(), 401)
+		return
+	} else {
+		next(res, req)
+	}
+}
+
+func New(options Options) *HMACAuth {
+	return &HMACAuth{options}
 }
 
 func signString(str string, secret string) string {
