@@ -20,7 +20,7 @@ const (
 	timestampParam      = "Timestamp"
 
 	// timestamp validation
-	maxNegativeTimeOffset time.Duration = -10 * time.Second
+	maxNegativeTimeOffset time.Duration = -20 * time.Second
 
 	// parsing bits
 	empty   = ""
