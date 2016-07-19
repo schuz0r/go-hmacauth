@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 	"log"
 	"net/http"
 	"sort"
@@ -80,9 +81,9 @@ func (ha HMACAuth) ServeHTTP(res http.ResponseWriter, req *http.Request, next ht
 	if ab, err = parseAuthHeader(req.Header.Get(authorizationHeader)); err == nil {
 		if err = validateTimestamp(ab.Timestamp, &ha.options); err == nil {
 			var sts string
-			if sts, err = stringToSign(req, &ha.options, ab.TimestampString); err == nil {
+			if sts, err = StringToSign(req, &ha.options, ab.TimestampString); err == nil {
 				if sk := ha.options.SecretKey(ab.APIKey); sk != empty {
-					if ab.Signature != signString(sts, sk) {
+					if ab.Signature != SignString(sts, sk) {
 						err = HMACAuthError{invalidSignature}
 					}
 				} else {
@@ -105,13 +106,13 @@ func New(options Options) *HMACAuth {
 	return &HMACAuth{options}
 }
 
-func signString(str string, secret string) string {
+func SignString(str string, secret string) string {
 	hash := hmac.New(sha256.New, []byte(secret))
 	hash.Write([]byte(str))
 	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
 }
 
-func stringToSign(req *http.Request, options *Options, timestamp string) (string, error) {
+func StringToSign(req *http.Request, options *Options, timestamp string) (string, error) {
 	var buffer bytes.Buffer
 
 	// Standard
@@ -119,7 +120,8 @@ func stringToSign(req *http.Request, options *Options, timestamp string) (string
 	buffer.WriteString(newline)
 	buffer.WriteString(req.Host)
 	buffer.WriteString(newline)
-	buffer.WriteString(req.URL.RequestURI())
+	//buffer.WriteString(req.URL.RequestURI())
+	buffer.WriteString(fmt.Sprintf("%s?%s", req.URL.Path, req.URL.RawQuery))
 	buffer.WriteString(newline)
 	buffer.WriteString(timestamp)
 	buffer.WriteString(newline)
